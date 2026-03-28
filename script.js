@@ -3,6 +3,25 @@
 const canvas = document.getElementById("board");
 const ctx = canvas.getContext("2d");
 
+const tg = window.Telegram?.WebApp;
+
+if (tg) {
+    tg.ready();
+    tg.expand();
+
+    try {
+        tg.disableVerticalSwipes?.();
+    } catch (e) {
+        console.log("disableVerticalSwipes not available", e);
+    }
+
+    document.body.style.overscrollBehavior = "none";
+}
+
+console.log("Telegram WebApp available:", !!tg);
+console.log("Telegram initData exists:", !!tg?.initData);
+console.log("Telegram user:", tg?.initDataUnsafe?.user || null);
+
 const startOverlay = document.getElementById("startOverlay");
 const gameOverOverlay = document.getElementById("gameOverOverlay");
 const finalScoreText = document.getElementById("finalScore");

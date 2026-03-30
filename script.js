@@ -1,5 +1,3 @@
-
-
 const canvas = document.getElementById("board");
 const ctx = canvas.getContext("2d");
 
@@ -21,8 +19,6 @@ if (tg) {
 console.log("Telegram WebApp available:", !!tg);
 console.log("Telegram initData exists:", !!tg?.initData);
 console.log("Telegram user:", tg?.initDataUnsafe?.user || null);
-
-alert("Telegram WebApp detected");
 
 const startOverlay = document.getElementById("startOverlay");
 const gameOverOverlay = document.getElementById("gameOverOverlay");
@@ -61,15 +57,60 @@ const scoreSfx = new Audio("assets/score.wav");
 let bird = { x: 90, y: 300, width: 51 * 0.9, height: 36 * 0.9 };
 let pipes = [];
 let score = 0;
-let bestScore = parseInt(localStorage.getItem("bestScore")) || 0;
+let bestScore = parseInt(localStorage.getItem("bestScore"), 10) || 0;
 let velocity = 0;
 const gravity = 0.25;
 const gap = 220;
 const pipeSpeed = 1.2;
-let bgX = 0, groundX = 0;
+let bgX = 0;
+let groundX = 0;
 let hasStarted = false;
 let gameOver = false;
 let flapTimer = 0;
+let scoreSubmitted = false;
+
+async function submitScoreToBackend(scoreValue) {
+    if (!tg || !tg.initData) {
+        console.log("Telegram initData not available, skip submit");
+        return;
+    }
+
+    if (!Number.isInteger(scoreValue) || scoreValue < 0) {
+        console.log("Invalid score, skip submit:", scoreValue);
+        return;
+    }
+
+    try {
+        console.log("Submitting score:", scoreValue);
+
+        const res = await fetch("https://tel-tetris.vercel.app/api/submit-score", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                game: "flappy",
+                score: scoreValue,
+                initData: tg.initData
+            })
+        });
+
+        const data = await res.json().catch(() => ({}));
+        console.log("submit-score response:", res.status, data);
+    } catch (err) {
+        console.error("submit-score failed:", err);
+    }
+}
+
+function updateLocalBestScore(scoreValue) {
+    if (scoreValue > bestScore) {
+        bestScore = scoreValue;
+        localStorage.setItem("bestScore", String(bestScore));
+    }
+
+    bestScoreText.textContent = bestScore;
+    startBestScoreText.textContent = bestScore;
+}
 
 function resetGame() {
     bird.y = 300;
@@ -79,6 +120,8 @@ function resetGame() {
     gameOver = false;
     hasStarted = false;
     flapTimer = 0;
+    scoreSubmitted = false;
+
     startOverlay.classList.remove("hidden");
     gameOverOverlay.classList.add("hidden");
     startBestScoreText.textContent = bestScore;
@@ -101,9 +144,25 @@ function jump() {
     if (!gameOver) {
         velocity = -6;
         flapSfx.currentTime = 0;
-        flapSfx.play();
+        flapSfx.play().catch(() => { });
     } else {
         restart();
+    }
+}
+
+function triggerGameOver() {
+    if (gameOver) return;
+
+    gameOver = true;
+    slapSfx.play().catch(() => { });
+
+    finalScoreText.textContent = score;
+    updateLocalBestScore(score);
+    gameOverOverlay.classList.remove("hidden");
+
+    if (!scoreSubmitted) {
+        scoreSubmitted = true;
+        submitScoreToBackend(score);
     }
 }
 
@@ -116,23 +175,28 @@ function update() {
             velocity += gravity;
             bird.y += velocity;
 
-            pipes.forEach(p => p.x -= pipeSpeed);
+            pipes.forEach((p) => {
+                p.x -= pipeSpeed;
+            });
 
             if (pipes[pipes.length - 1].x < 200) {
                 pipes.push({ x: 400, y: randY(), scored: false });
             }
 
-            if (pipes[0].x < -80) pipes.shift();
+            if (pipes[0].x < -80) {
+                pipes.shift();
+            }
 
-            pipes.forEach(p => {
+            pipes.forEach((p) => {
                 if (!p.scored && p.x + 79 < bird.x) {
                     score++;
                     p.scored = true;
-                    scoreSfx.play();
+                    scoreSfx.currentTime = 0;
+                    scoreSfx.play().catch(() => { });
                 }
             });
 
-            pipes.forEach(p => {
+            pipes.forEach((p) => {
                 if (
                     collides(bird.x, bird.y, bird.width, bird.height, p.x, p.y - 360, 79, 360) ||
                     collides(bird.x, bird.y, bird.width, bird.height, p.x, p.y + gap, 79, 360)
@@ -153,25 +217,13 @@ function update() {
     requestAnimationFrame(update);
 }
 
-function triggerGameOver() {
-    gameOver = true;
-    slapSfx.play();
-    finalScoreText.textContent = score;
-    if (score > bestScore) {
-        bestScore = score;
-        localStorage.setItem("bestScore", bestScore);
-    }
-    bestScoreText.textContent = bestScore;
-    gameOverOverlay.classList.remove("hidden");
-}
-
 function draw() {
     ctx.clearRect(0, 0, baseWidth, baseHeight);
 
     ctx.drawImage(bgImg, bgX, 0, baseWidth, baseHeight);
     ctx.drawImage(bgImg, bgX + baseWidth - 1, 0, baseWidth, baseHeight);
 
-    pipes.forEach(p => {
+    pipes.forEach((p) => {
         ctx.drawImage(pipeDownImg, p.x, p.y - 360, 79, 360);
         ctx.drawImage(pipeUpImg, p.x, p.y + gap, 79, 360);
     });
@@ -179,7 +231,6 @@ function draw() {
     ctx.drawImage(groundImg, groundX, 536, baseWidth, 64);
     ctx.drawImage(groundImg, groundX + baseWidth, 536, baseWidth, 64);
 
-    // Bird direction & rotation
     let sprite;
     if (!hasStarted) {
         sprite = Math.floor(flapTimer) % 2 === 0 ? birdSprites.mid : birdSprites.up;
@@ -191,10 +242,11 @@ function draw() {
         sprite = birdSprites.mid;
     }
 
-    let angle = Math.max(Math.min(velocity * 3, 25), -25);
+    const angle = Math.max(Math.min(velocity * 3, 25), -25);
+
     ctx.save();
     ctx.translate(bird.x + bird.width / 2, bird.y + bird.height / 2);
-    ctx.rotate(angle * Math.PI / 180);
+    ctx.rotate((angle * Math.PI) / 180);
     ctx.drawImage(sprite, -bird.width / 2, -bird.height / 2, bird.width, bird.height);
     ctx.restore();
 
@@ -209,14 +261,19 @@ function draw() {
 }
 
 function collides(x1, y1, w1, h1, x2, y2, w2, h2) {
-    return x1 < x2 + w2 &&
+    return (
+        x1 < x2 + w2 &&
         x2 < x1 + w1 &&
         y1 < y2 + h2 &&
-        y2 < y1 + h1;
+        y2 < y1 + h1
+    );
 }
 
-window.addEventListener("keydown", e => {
-    if (e.code === "Space") jump();
+window.addEventListener("keydown", (e) => {
+    if (e.code === "Space") {
+        e.preventDefault();
+        jump();
+    }
 });
 
 window.addEventListener("mousedown", jump);
@@ -227,16 +284,24 @@ window.addEventListener("touchstart", (e) => {
 }, { passive: false });
 
 function resizeCanvas() {
-    const container = document.getElementById('container');
-    const canvas = document.getElementById('board');
+    const board = document.getElementById("board");
+    const footer = document.querySelector("footer");
     const aspect = 2 / 3;
 
     let width = window.innerWidth;
     let height = window.innerHeight;
-    const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
     if (isMobile) {
-        canvas.style.marginTop = "-50px";
-        document.querySelector('footer').style.bottom = '8vh';
+        board.style.marginTop = "-50px";
+        if (footer) {
+            footer.style.bottom = "8vh";
+        }
+    } else {
+        board.style.marginTop = "0";
+        if (footer) {
+            footer.style.bottom = "";
+        }
     }
 
     if (width / height > aspect) {
@@ -245,17 +310,24 @@ function resizeCanvas() {
         height = width / aspect;
     }
 
-    canvas.style.width = width + "px";
-    canvas.style.height = height + "px";
+    board.style.width = width + "px";
+    board.style.height = height + "px";
 }
 
 resizeCanvas();
 window.addEventListener("resize", resizeCanvas);
+
 const assetsToLoad = [
-    bgImg, groundImg,
-    birdSprites.up, birdSprites.mid, birdSprites.down,
-    pipeUpImg, pipeDownImg,
-    flapSfx, slapSfx, scoreSfx
+    bgImg,
+    groundImg,
+    birdSprites.up,
+    birdSprites.mid,
+    birdSprites.down,
+    pipeUpImg,
+    pipeDownImg,
+    flapSfx,
+    slapSfx,
+    scoreSfx
 ];
 
 let assetsLoaded = 0;
@@ -263,28 +335,31 @@ const loadingOverlay = document.getElementById("loadingOverlay");
 
 function checkAllAssetsLoaded() {
     assetsLoaded++;
+
     if (assetsLoaded === assetsToLoad.length) {
-        // Hide loading, start game
         loadingOverlay.classList.add("hidden");
         startOverlay.classList.remove("hidden");
-
         resetGame();
         update();
-
     }
 }
 
-assetsToLoad.forEach(asset => {
+assetsToLoad.forEach((asset) => {
     if (asset instanceof HTMLImageElement) {
-        asset.onload = checkAllAssetsLoaded;
+        if (asset.complete) {
+            checkAllAssetsLoaded();
+        } else {
+            asset.onload = checkAllAssetsLoaded;
+            asset.onerror = checkAllAssetsLoaded;
+        }
     } else if (asset instanceof HTMLAudioElement) {
         asset.oncanplaythrough = checkAllAssetsLoaded;
+        asset.onerror = checkAllAssetsLoaded;
     }
 });
 
-///pwa
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js')
-        .then(reg => console.log('Service Worker registered:', reg.scope))
-        .catch(err => console.error('Service Worker registration failed:', err));
+if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("sw.js")
+        .then((reg) => console.log("Service Worker registered:", reg.scope))
+        .catch((err) => console.error("Service Worker registration failed:", err));
 }

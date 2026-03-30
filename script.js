@@ -22,6 +22,8 @@ console.log("Telegram WebApp available:", !!tg);
 console.log("Telegram initData exists:", !!tg?.initData);
 console.log("Telegram user:", tg?.initDataUnsafe?.user || null);
 
+alert("Telegram WebApp detected");
+
 const startOverlay = document.getElementById("startOverlay");
 const gameOverOverlay = document.getElementById("gameOverOverlay");
 const finalScoreText = document.getElementById("finalScore");

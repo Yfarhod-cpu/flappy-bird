@@ -89,7 +89,7 @@ async function submitScoreToBackend(scoreValue) {
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
-                game: "flappy",
+                gameKey: "flappy",
                 score: scoreValue,
                 initData: tg.initData
             })

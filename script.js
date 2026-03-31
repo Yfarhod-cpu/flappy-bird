@@ -16,10 +16,6 @@ if (tg) {
     document.body.style.overscrollBehavior = "none";
 }
 
-console.log("Telegram WebApp available:", !!tg);
-console.log("Telegram initData exists:", !!tg?.initData);
-console.log("Telegram user:", tg?.initDataUnsafe?.user || null);
-
 const startOverlay = document.getElementById("startOverlay");
 const gameOverOverlay = document.getElementById("gameOverOverlay");
 const finalScoreText = document.getElementById("finalScore");
@@ -57,7 +53,7 @@ const scoreSfx = new Audio("assets/score.wav");
 let bird = { x: 90, y: 300, width: 51 * 0.9, height: 36 * 0.9 };
 let pipes = [];
 let score = 0;
-let bestScore = parseInt(localStorage.getItem("bestScore"), 10) || 0;
+let bestScore = 0;
 let velocity = 0;
 const gravity = 0.25;
 const gap = 220;
@@ -69,43 +65,35 @@ let gameOver = false;
 let flapTimer = 0;
 let scoreSubmitted = false;
 
-async function submitScoreToBackend(scoreValue) {
-    if (!tg || !tg.initData) {
-        console.log("Telegram initData not available, skip submit");
-        return;
-    }
+window.submitScore = async (scoreValue) => {
+    const tgApp = window.Telegram?.WebApp;
+    const initData = tgApp?.initData || "";
 
-    if (!Number.isInteger(scoreValue) || scoreValue < 0) {
-        console.log("Invalid score, skip submit:", scoreValue);
-        return;
-    }
+    if (!initData) return;
 
     try {
-        console.log("Submitting score:", scoreValue);
-
         const res = await fetch("https://tel-tetris.vercel.app/api/submit-score", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
-                gameKey: "flappy",
                 score: scoreValue,
-                initData: tg.initData
+                initData,
+                gameKey: "flappy"
             })
         });
 
         const data = await res.json().catch(() => ({}));
-        console.log("submit-score response:", res.status, data);
-    } catch (err) {
-        console.error("submit-score failed:", err);
+        console.log("submit-score:", res.status, data);
+    } catch (e) {
+        console.warn("submit-score failed", e);
     }
-}
+};
 
-function updateLocalBestScore(scoreValue) {
+function updateBestScoreDisplay(scoreValue) {
     if (scoreValue > bestScore) {
         bestScore = scoreValue;
-        localStorage.setItem("bestScore", String(bestScore));
     }
 
     bestScoreText.textContent = bestScore;
@@ -124,7 +112,9 @@ function resetGame() {
 
     startOverlay.classList.remove("hidden");
     gameOverOverlay.classList.add("hidden");
+    finalScoreText.textContent = "0";
     startBestScoreText.textContent = bestScore;
+    bestScoreText.textContent = bestScore;
 }
 
 function restart() {
@@ -154,15 +144,16 @@ function triggerGameOver() {
     if (gameOver) return;
 
     gameOver = true;
+    slapSfx.currentTime = 0;
     slapSfx.play().catch(() => { });
 
     finalScoreText.textContent = score;
-    updateLocalBestScore(score);
+    updateBestScoreDisplay(score);
     gameOverOverlay.classList.remove("hidden");
 
     if (!scoreSubmitted) {
         scoreSubmitted = true;
-        submitScoreToBackend(score);
+        window.submitScore?.(score);
     }
 }
 

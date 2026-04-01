@@ -72,7 +72,7 @@ window.submitScore = async (scoreValue) => {
     if (!initData) return;
 
     try {
-        const res = await fetch("https://tel-tetris.vercel.app/api/submit-score", {
+        const res = await fetch("/api/submit-score", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"

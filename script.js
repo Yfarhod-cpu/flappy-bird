@@ -9,9 +9,7 @@ if (tg) {
 
     try {
         tg.disableVerticalSwipes?.();
-    } catch (e) {
-        console.log("disableVerticalSwipes not available", e);
-    }
+    } catch (_) { }
 
     document.body.style.overscrollBehavior = "none";
 }
@@ -65,6 +63,26 @@ let gameOver = false;
 let flapTimer = 0;
 let scoreSubmitted = false;
 
+async function loadLeaderboardBestScore() {
+    try {
+        const res = await fetch("/api/leaderboard?game=flappy");
+        const rows = await res.json();
+
+        if (Array.isArray(rows) && rows.length > 0) {
+            const topScore = Number(rows[0].best_score) || 0;
+            bestScore = topScore;
+        } else {
+            bestScore = 0;
+        }
+
+        bestScoreText.textContent = bestScore;
+        startBestScoreText.textContent = bestScore;
+    } catch (_) {
+        bestScoreText.textContent = bestScore;
+        startBestScoreText.textContent = bestScore;
+    }
+}
+
 window.submitScore = async (scoreValue) => {
     const tgApp = window.Telegram?.WebApp;
     const initData = tgApp?.initData || "";
@@ -72,7 +90,7 @@ window.submitScore = async (scoreValue) => {
     if (!initData) return;
 
     try {
-        const res = await fetch("/api/submit-score", {
+        await fetch("/api/submit-score", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
@@ -83,12 +101,7 @@ window.submitScore = async (scoreValue) => {
                 gameKey: "flappy"
             })
         });
-
-        const data = await res.json().catch(() => ({}));
-        console.log("submit-score:", res.status, data);
-    } catch (e) {
-        console.warn("submit-score failed", e);
-    }
+    } catch (_) { }
 };
 
 function updateBestScoreDisplay(scoreValue) {
@@ -154,6 +167,9 @@ function triggerGameOver() {
     if (!scoreSubmitted) {
         scoreSubmitted = true;
         window.submitScore?.(score);
+        setTimeout(() => {
+            loadLeaderboardBestScore();
+        }, 400);
     }
 }
 
@@ -331,6 +347,7 @@ function checkAllAssetsLoaded() {
         loadingOverlay.classList.add("hidden");
         startOverlay.classList.remove("hidden");
         resetGame();
+        loadLeaderboardBestScore();
         update();
     }
 }
@@ -351,6 +368,6 @@ assetsToLoad.forEach((asset) => {
 
 if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js")
-        .then((reg) => console.log("Service Worker registered:", reg.scope))
-        .catch((err) => console.error("Service Worker registration failed:", err));
+        .then(() => { })
+        .catch(() => { });
 }

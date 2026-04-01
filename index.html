@@ -5,11 +5,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="description" content="Play Flappy Bird online, built with HTML5 and JavaScript!" />
+    <meta name="description" content="Play Flappy Bird in Telegram." />
     <meta property="og:title" content="Flappy Bird" />
-    <meta property="og:description" content="A smooth Flappy Bird remake hosted on semant.is-a.dev. Tap to fly!" />
-    <meta property="og:image" content="https://semant.is-a.dev/flappy-bird/assets/thumbnail.png" />
-    <meta property="og:url" content="https://semant.is-a.dev/flappy-bird" />
+    <meta property="og:description" content="Tap to fly and avoid the pipes." />
+    <meta property="og:image" content="assets/thumbnail.png" />
+    <meta property="og:url" content="/" />
     <meta name="twitter:card" content="summary_large_image" />
     <title>Flappy Bird</title>
     <link rel="stylesheet" href="style.css" />
@@ -18,25 +18,11 @@
 </head>
 
 <body>
-    <video id="jumpscare" loop src="./assets/cute.mp4" style="
- display: none;
-  position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: 100vh;
-  object-fit: fill;
-  background-color: black;
-  z-index: 9999;
-" preload="auto" playsinline></video>
-
     <div id="container">
         <div id="loadingOverlay" class="overlay">
-            <div>Injecting pixelated chaos...</div>
+            <div>Loading...</div>
         </div>
 
-        <footer>
-            Made with ❤️ by <a href="https://semant.is-a.dev" target="_blank">Semant</a>
-        </footer>
         <canvas id="board" width="400" height="600"></canvas>
 
         <div id="startOverlay" class="overlay hidden">
